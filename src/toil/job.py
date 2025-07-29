@@ -414,13 +414,14 @@ class RequirementsDict(TypedDict):
 
     cores: NotRequired[Union[int, float]]
     memory: NotRequired[int]
+    walltime: NotRequired[int]
     disk: NotRequired[int]
     accelerators: NotRequired[list[AcceleratorRequirement]]
     preemptible: NotRequired[bool]
 
 
 # These must be all the key names in RequirementsDict
-REQUIREMENT_NAMES = ["disk", "memory", "cores", "accelerators", "preemptible"]
+REQUIREMENT_NAMES = ["disk", "walltime", "memory", "cores", "accelerators", "preemptible"]
 
 # This is the supertype of all value types in RequirementsDict
 ParsedRequirement = Union[int, float, bool, list[AcceleratorRequirement]]
@@ -449,7 +450,7 @@ class Requirer:
     """
     Base class implementing the storage and presentation of requirements.
 
-    Has cores, memory, disk, and preemptability as properties.
+    Has cores, walltime, memory, disk, and preemptability as properties.
     """
 
     _requirementOverrides: RequirementsDict
@@ -459,7 +460,7 @@ class Requirer:
         Parse and save the given requirements.
 
         :param dict requirements: Dict from string to value
-            describing a set of resource requirments. 'cores', 'memory',
+            describing a set of resource requirments. 'cores', 'walltime', 'memory',
             'disk', 'preemptible', and 'accelerators' fields, if set, are
             parsed and broken out into properties. If unset, the relevant
             property will be unspecified, and will be pulled from the assigned
@@ -540,7 +541,7 @@ class Requirer:
     @overload
     @staticmethod
     def _parseResource(
-        name: Union[Literal["memory"], Literal["disks"]],
+        name: Union[Literal["memory"], Literal["disks"], Literal["walltime"]],
         value: ParseableIndivisibleResource,
     ) -> int: ...
 
@@ -599,7 +600,7 @@ class Requirer:
             # Anything can be None.
             return value
 
-        if name in ("memory", "disk", "cores"):
+        if name in ("memory", "disk", "cores", "walltime"):
             # These should be numbers that accept things like "5G".
             if isinstance(value, (str, bytes)):
                 value = human2bytes(value)
@@ -706,6 +707,15 @@ class Requirer:
     @memory.setter
     def memory(self, val: ParseableIndivisibleResource) -> None:
         self._requirementOverrides["memory"] = Requirer._parseResource("memory", val)
+
+    @property
+    def walltime(self) -> int:
+        """Get the maximum walltime in seconds allowed."""
+        return cast(int, self._fetchRequirement("walltime"))
+
+    @walltime.setter
+    def walltime(self, val: ParseableIndivisibleResource) -> None:
+        self._requirementOverrides["walltime"] = Requirer._parseResource("walltime", val)
 
     @property
     def cores(self) -> Union[int, float]:
@@ -828,7 +838,7 @@ class JobDescription(Requirer):
 
         :param requirements: Dict from string to number, string, or bool
             describing the resource requirements of the job. 'cores', 'memory',
-            'disk', and 'preemptible' fields, if set, are parsed and broken out
+            'disk', 'walltime', and 'preemptible' fields, if set, are parsed and broken out
             into properties. If unset, the relevant property will be
             unspecified, and will be pulled from the assigned Config object if
             queried (see :meth:`toil.job.Requirer.assignConfig`).
@@ -1649,6 +1659,7 @@ class Job:
 
     def __init__(
         self,
+        walltime: Optional[ParseableIndivisibleResource] = None,
         memory: Optional[ParseableIndivisibleResource] = None,
         cores: Optional[ParseableDivisibleResource] = None,
         disk: Optional[ParseableIndivisibleResource] = None,
@@ -1667,6 +1678,7 @@ class Job:
 
         This method must be called by any overriding constructor.
 
+        :param walltime: the maximum walltime in seconds that the job is allowed to run.
         :param memory: the maximum number of bytes of memory the job will require to run.
         :param cores: the number of CPU cores required.
         :param disk: the amount of local disk space required by the job, expressed in bytes.
@@ -1683,6 +1695,7 @@ class Job:
         :param local: if the job can be run on the leader.
         :param files: Set of Files that the job will want to use.
 
+        :type walltime: int or string convertible by toil.lib.conversions.human2bytes to an int
         :type memory: int or string convertible by toil.lib.conversions.human2bytes to an int
         :type cores: float, int, or string convertible by toil.lib.conversions.human2bytes to an int
         :type disk: int or string convertible by toil.lib.conversions.human2bytes to an int
@@ -1705,6 +1718,7 @@ class Job:
             preemptible = preemptable
         # Build a requirements dict for the description
         requirements = {
+            "walltime": walltime,
             "memory": memory,
             "cores": cores,
             "disk": disk,
@@ -1814,6 +1828,15 @@ class Job:
     @disk.setter
     def disk(self, val: int) -> None:
         self.description.disk = val
+
+    @property
+    def walltime(self) -> int:
+        """The maximum walltime in seconds that the job is allowed to run."""
+        return self.description.walltime
+
+    @walltime.setter
+    def walltime(self, val: int) -> None:
+        self.description.walltime = val
 
     @property
     def memory(self) -> int:
@@ -2581,6 +2604,7 @@ class Job:
 
         def __init__(
             self,
+            walltime: Optional[ParseableIndivisibleResource] = None,
             memory: Optional[ParseableIndivisibleResource] = None,
             cores: Optional[ParseableDivisibleResource] = None,
             disk: Optional[ParseableIndivisibleResource] = None,
@@ -2589,13 +2613,14 @@ class Job:
             unitName: Optional[str] = "",
         ) -> None:
             """
-            Memory, core and disk requirements are specified identically to as in \
+            Memory, walltime, core and disk requirements are specified identically to as in \
             :func:`toil.job.Job.__init__`.
             """
             # Save the requirements in ourselves so they are visible on `self` to user code.
             super().__init__(
                 {
                     "memory": memory,
+                    "walltime": walltime,
                     "cores": cores,
                     "disk": disk,
                     "accelerators": accelerators,
@@ -3321,7 +3346,7 @@ class FunctionWrappingJob(Job):
                ``**kwargs`` as arguments.
 
         The keywords ``memory``, ``cores``, ``disk``, ``accelerators`,
-        ``preemptible`` and ``checkpoint`` are reserved keyword arguments that
+        ``preemptible``, ``walltime``, and ``checkpoint`` are reserved keyword arguments that
         if specified will be used to determine the resources required for the
         job, as :func:`toil.job.Job.__init__`. If they are keyword arguments to
         the function they will be extracted from the function definition, but
@@ -3358,6 +3383,7 @@ class FunctionWrappingJob(Job):
 
         super().__init__(
             memory=resolve("memory", dehumanize=True),
+            walltime=resolve("walltime", dehumanize=True),
             cores=resolve("cores", dehumanize=True),
             disk=resolve("disk", dehumanize=True),
             accelerators=resolve("accelerators"),
@@ -3416,6 +3442,7 @@ class JobFunctionWrappingJob(FunctionWrappingJob):
     can be specified:
 
         - memory
+        - walltime
         - disk
         - cores
         - accelerators
@@ -3423,7 +3450,7 @@ class JobFunctionWrappingJob(FunctionWrappingJob):
 
     For example to wrap a function into a job we would call::
 
-        Job.wrapJobFn(myJob, memory='100k', disk='1M', cores=0.1)
+        Job.wrapJobFn(myJob, memory='100k', disk='1M', cores=0.1, walltime=0)
 
     """
 
@@ -3452,6 +3479,7 @@ class PromisedRequirementFunctionWrappingJob(FunctionWrappingJob):
                 disk="1M",
                 memory="32M",
                 cores=0.1,
+                walltime=0,
                 accelerators=[],
                 preemptible=True,
                 preemptable=True,
@@ -3550,6 +3578,7 @@ class EncapsulatedJob(Job):
                 disk="100M",
                 memory="512M",
                 cores=0.1,
+                walltime=0,
                 unitName=None if unitName is None else unitName + "-followOn",
             )
             Job.addFollowOn(self, self.encapsulatedFollowOn)
