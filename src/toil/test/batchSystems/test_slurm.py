@@ -532,36 +532,36 @@ class SlurmTest(ToilTest):
 
         # Without a partition override in the environment, we should get the
         # "short" partition for this job
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--partition=short" in command
 
         # With a partition override, we should not. But the override will be rewritten.
         self.worker.boss.config.slurm_args = "--something --partition foo --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--partition=short" not in command
         assert "--partition=foo" in command
 
         # All ways of setting partition should work, including =
         self.worker.boss.config.slurm_args = "--something --partition=foo --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--partition=short" not in command
         assert "--partition=foo" in command
 
         # And short options
         self.worker.boss.config.slurm_args = "--something -p foo --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--partition=short" not in command
         assert "--partition=foo" in command
 
         # Partition settings from the config should override automatic selection
         self.worker.boss.config.slurm_partition = "foobar"
         self.worker.boss.config.slurm_args = "--something --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--partition=foobar" in command
 
         # But they should be overridden by the argument overrides
         self.worker.boss.config.slurm_args = "--something --partition=baz --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--partition=baz" in command
 
     def test_prepareSbatch_time(self):
@@ -573,7 +573,7 @@ class SlurmTest(ToilTest):
 
         # Without a time override in the environment, we should use the normal
         # time and the "short" partition
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         logger.debug("Command: %s", command)
         assert "--time=0:30" in command
         assert "--partition=short" in command
@@ -581,21 +581,21 @@ class SlurmTest(ToilTest):
         # With a time override, we should use it, slightly translated, and it
         # should change the selected partition.
         self.worker.boss.config.slurm_args = "--something --time 10:00:00 --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         logger.debug("Command: %s", command)
         assert "--partition=medium" in command
         assert "--time=0:36000" in command
 
         # All ways of setting time should work, including =
         self.worker.boss.config.slurm_args = "--something --time=10:00:00 --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         logger.debug("Command: %s", command)
         assert "--partition=medium" in command
         assert "--time=0:36000" in command
 
         # And short options
         self.worker.boss.config.slurm_args = "--something -t 10:00:00 --somethingElse"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         logger.debug("Command: %s", command)
         assert "--partition=medium" in command
         assert "--time=0:36000" in command
@@ -606,17 +606,17 @@ class SlurmTest(ToilTest):
         self.worker.boss.partitions = ps
 
         # Without any overrides, we need --export=ALL
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--export=ALL" in command
 
         # With overrides, we don't get --export=ALL
         self.worker.boss.config.slurm_args = "--export=foo"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--export=ALL" not in command
 
         # With --export-file, we don't get --export=ALL as documented.
         self.worker.boss.config.slurm_args = "--export-file=./thefile.txt"
-        command = self.worker.prepareSbatch(1, 100, 5, "job5", None, None)
+        command = self.worker.prepareSbatch(1, 100, 5, 0, "job5", None, None)
         assert "--export=ALL" not in command
 
     def test_option_detector(self):

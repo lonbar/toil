@@ -300,6 +300,7 @@ class SlurmBatchSystem(AbstractGridEngineBatchSystem):
             self,
             cpu: int,
             memory: int,
+            walltime: int,
             jobID: int,
             command: str,
             jobName: str,
@@ -309,7 +310,7 @@ class SlurmBatchSystem(AbstractGridEngineBatchSystem):
             # Make sure to use exec so we can get Slurm's signals in the Toil
             # worker instead of having an intervening Bash
             return self.prepareSbatch(
-                cpu, memory, jobID, jobName, job_environment, gpus
+                cpu, memory, walltime, jobID, jobName, job_environment, gpus
             ) + [f"--wrap=exec {command}"]
 
         def submitJob(self, subLine: list[str]) -> int:
@@ -639,6 +640,7 @@ class SlurmBatchSystem(AbstractGridEngineBatchSystem):
             self,
             cpu: int,
             mem: int,
+            walltime: int,
             jobID: int,
             jobName: str,
             job_environment: dict[str, str] | None,
@@ -686,7 +688,7 @@ class SlurmBatchSystem(AbstractGridEngineBatchSystem):
             # --export=[ALL,]<environment_toil_variables>
             export_all = True
             export_list = [] # Some items here may be multiple comma-separated values
-            time_limit: int | None = self.boss.config.slurm_time  # type: ignore[attr-defined]
+            time_limit: int = self.boss.config.slurm_time or walltime # type: ignore[attr-defined]
             partition: str | None = None
 
             if nativeConfig is not None:
@@ -832,7 +834,7 @@ class SlurmBatchSystem(AbstractGridEngineBatchSystem):
                 sbatch_line.append(f"--mem={math.ceil(mem / 2 ** 20)}")
             if cpu is not None:
                 sbatch_line.append(f"--cpus-per-task={math.ceil(cpu)}")
-            if time_limit is not None:
+            if time_limit > 0:
                 # Put all the seconds in the seconds slot
                 sbatch_line.append(f"--time=0:{time_limit}")
 
@@ -879,6 +881,7 @@ class SlurmBatchSystem(AbstractGridEngineBatchSystem):
                     job_id,
                     job_desc.cores,
                     memory,
+                    job_desc.walltime,
                     command,
                     get_job_kind(job_desc.get_names()),
                     job_environment,
