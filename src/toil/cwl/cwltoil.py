@@ -2176,6 +2176,7 @@ class CWLNamedJob(Job):
     def __init__(
         self,
         cores: Union[float, None] = 1,
+        walltime: Union[int, None] = 0,
         memory: Union[int, str, None] = "1GiB",
         disk: Union[int, str, None] = "1MiB",
         accelerators: Optional[list[AcceleratorRequirement]] = None,
@@ -2221,6 +2222,7 @@ class CWLNamedJob(Job):
         # Set up the job with the right requirements and names.
         super().__init__(
             cores=cores,
+            walltime=walltime,
             memory=memory,
             disk=disk,
             accelerators=accelerators,
@@ -2556,6 +2558,14 @@ class CWLJob(CWLNamedJob):
             # Note: if the job is using the toil default memory, it won't be increased
             memory = max(memory, min_ram)
 
+        # Check if the tool has set a time limit. If yes, use it. Otherwise,
+        # use a None requirement to use the Toil default.
+        tool_max_walltime = tool.get_requirement("ToolTimeLimit")[0] or {}
+        if "timelimit" in tool_max_walltime:
+            walltime = int(tool_max_walltime["timelimit"])
+        else:
+            walltime = None
+
         accelerators: Optional[list[AcceleratorRequirement]] = None
         if req.get("cudaDeviceCount", 0) > 0:
             # There's a CUDARequirement, which cwltool processed for us
@@ -2621,6 +2631,7 @@ class CWLJob(CWLNamedJob):
         super().__init__(
             cores=req["cores"],
             memory=memory,
+            walltime=walltime,
             disk=int(total_disk),
             accelerators=accelerators,
             preemptible=preemptible,
