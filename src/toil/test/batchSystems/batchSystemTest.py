@@ -87,7 +87,7 @@ preemptible = False
 # Since we aren't always attaching the config to the jobs for these tests, we
 # need to use fully specified requirements.
 defaultRequirements = dict(
-    memory=int(100e6), cores=1, disk=1000, preemptible=preemptible, accelerators=[]
+    memory=int(100e6), cores=1, disk=1000, preemptible=preemptible, accelerators=[], walltime=0
 )
 
 
@@ -917,7 +917,6 @@ class SingleMachineBatchSystemTest(hidden.AbstractBatchSystemTest):
         Test to make sure that child processes and their descendants go away
         when the Toil workflow stops, even if the job process stops and leaves children.
         """
-
         self.testProcessEscape(hide=True)
 
 
@@ -1025,6 +1024,7 @@ class MaxCoresSingleMachineBatchSystemTest(ToilTest):
                                     requirements=dict(
                                         cores=float(coresPerJob),
                                         memory=1,
+                                        walltime=0,
                                         disk=1,
                                         accelerators=[],
                                         preemptible=preemptible,
