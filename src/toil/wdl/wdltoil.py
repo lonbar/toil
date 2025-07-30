@@ -3594,6 +3594,7 @@ class WDLTaskWrapperJob(WDLBaseJob):
 
         # Fill these in with not-None if the workflow asks for each resource.
         runtime_memory: int | None = None
+        runtime_walltime: int | None = None
         runtime_cores: float | None = None
         runtime_disk: int | None = None
         runtime_accelerators: list[AcceleratorRequirement] | None = None
@@ -3601,6 +3602,9 @@ class WDLTaskWrapperJob(WDLBaseJob):
         if runtime_bindings.has_binding("cpu"):
             cpu_spec: int = runtime_bindings.resolve("cpu").value
             runtime_cores = float(cpu_spec)
+
+        if runtime_bindings.has_binding("walltime"):
+            runtime_walltime: int = runtime_bindings.resolve("walltime").value
 
         if runtime_bindings.has_binding("memory"):
             # Get the memory requirement and convert to bytes
@@ -3711,6 +3715,7 @@ class WDLTaskWrapperJob(WDLBaseJob):
             self._task_id,
             cores=runtime_cores or self.cores,
             memory=runtime_memory or self.memory,
+            walltime=runtime_walltime or self.walltime,
             disk=runtime_disk or self.disk,
             accelerators=runtime_accelerators or self.accelerators,
             mount_spec=mount_spec,
